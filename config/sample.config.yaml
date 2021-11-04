@@ -1,0 +1,4 @@
+language: et
+parameters:
+  checkpoint_path: models
+  spm_model: models/spm.model
