@@ -66,9 +66,9 @@ def merge_different(chunk1, chunk2):
     flat1 = flatten_chunk(chunk1)
     flat2 = flatten_chunk(chunk2)
 
-    preres = list(flat1) + list(flat2)
+    pre_res = list(flat1) + list(flat2)
 
-    res = accumulate(preres)
+    res = accumulate(pre_res)
 
     return res
 
