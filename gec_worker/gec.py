@@ -1,9 +1,10 @@
 import itertools
 import logging
 from typing import List
+import wordndiff
 
 from nltk import sent_tokenize
-from .utils import Response, Request
+from .utils import Response, Request, Correction, Replacement, Span
 
 logger = logging.getLogger("gec_worker")
 
@@ -42,7 +43,36 @@ class GEC:
         return sentences, delimiters
 
     def _generate_spans(self, original: str, corrected: str) -> Response:
-        pass  # TODO
+        response = Response()
+        original_w = wordndiff.applyWeight(original.split(), 1)
+        corrected_w = wordndiff.applyWeight(corrected.split(), 2)
+        combo = wordndiff.joinseqs(original_w, corrected_w)
+        beginning = ''
+        for e in combo:
+            if len(e) == 1:
+                beginning += ' '.join(e[0][0]) + ' '
+            else:
+                ordered = sorted(e, key=lambda x: x[1])
+                original_text = ' '.join(ordered[0][0]) + ' '
+                correction_text = ' '.join(ordered[1][0]) + ' '
+                
+                start_in_original = len(beginning)
+                if original_text != ' ':
+                    beginning += original_text
+                    end_in_original = len(beginning)
+                else:
+                    end_in_original = start_in_original + len(original_text) # addition
+
+                if correction_text != ' ':
+                    replacements = [Replacement(correction_text)]
+                else:
+                    replacements = None # deletion
+
+                correction = Correction(Span(start_in_original, end_in_original), replacements)
+                if response.corrections == None:
+                    response.corrections = []
+                response.corrections.append(correction)
+        return response
 
     def correct(self, sentences: List[str], language) -> List[str]:
         return self.model.translate(sentences, src_language=language, tgt_language=language)
