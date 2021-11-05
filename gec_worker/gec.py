@@ -1,7 +1,7 @@
 import itertools
 import logging
 from typing import List
-import wordndiff
+import word_diff
 
 from nltk import sent_tokenize
 from .utils import Response, Request, Correction, Replacement, Span
@@ -42,11 +42,12 @@ class GEC:
 
         return sentences, delimiters
 
-    def _generate_spans(self, original: str, corrected: str) -> Response:
+    @staticmethod
+    def _generate_spans(original: str, corrected: str) -> Response:
         response = Response()
-        original_w = wordndiff.applyWeight(original.split(), 1)
-        corrected_w = wordndiff.applyWeight(corrected.split(), 2)
-        combo = wordndiff.joinseqs(original_w, corrected_w)
+        original_w = word_diff.apply_weight(original.split(), 1)
+        corrected_w = word_diff.apply_weight(corrected.split(), 2)
+        combo = word_diff.join_sequences(original_w, corrected_w)
         beginning = ''
         for e in combo:
             if len(e) == 1:
@@ -55,21 +56,21 @@ class GEC:
                 ordered = sorted(e, key=lambda x: x[1])
                 original_text = ' '.join(ordered[0][0]) + ' '
                 correction_text = ' '.join(ordered[1][0]) + ' '
-                
+
                 start_in_original = len(beginning)
                 if original_text != ' ':
                     beginning += original_text
                     end_in_original = len(beginning)
                 else:
-                    end_in_original = start_in_original + len(original_text) # addition
+                    end_in_original = start_in_original + len(original_text)  # addition
 
                 if correction_text != ' ':
                     replacements = [Replacement(correction_text)]
                 else:
-                    replacements = None # deletion
+                    replacements = None  # deletion
 
                 correction = Correction(Span(start_in_original, end_in_original), replacements)
-                if response.corrections == None:
+                if response.corrections is None:
                     response.corrections = []
                 response.corrections.append(correction)
         return response
