@@ -1,5 +1,7 @@
 from difflib import SequenceMatcher
 
+from gec_worker.utils import Response, Replacement, Correction, Span
+
 
 def apply_weight(seq, weight):
     return [[[[elem], weight]] for elem in seq]
@@ -48,7 +50,6 @@ def accumulate(seq):
 
 def flatten_chunk(seq, finalize=True):
     if len(seq) == 0:
-        # return seq
         return [[[], 1]]
 
     if finalize:
@@ -57,8 +58,11 @@ def flatten_chunk(seq, finalize=True):
     if len(seq) == 1:
         return seq[0]
     else:
-        res = [[list(currElemSeq) + list(branchSeq), min(currElemWeight, branchWeight)] for currElemSeq, currElemWeight
-               in seq[0] for branchSeq, branchWeight in flatten_chunk(seq[1:], False)]
+        res = [
+            [list(curr_elem_seq) + list(branch_seq), min(curr_elem_weight, branch_weight)]
+            for curr_elem_seq, curr_elem_weight in seq[0]
+            for branch_seq, branch_weight in flatten_chunk(seq[1:], False)
+        ]
         return res
 
 
@@ -85,20 +89,71 @@ def merge_chunks(chunk1, chunk2):
 def join_sequences(seq1, seq2):
     matcher = SequenceMatcher(None, to_str(seq1), to_str(seq2))
 
-    prev1 = None
-    prev2 = None
+    prev1 = 0
+    prev2 = 0
 
     result = []
 
-    for begin1, begin2, chunkSize in matcher.get_matching_blocks():
-        if chunkSize > 0:
-            if prev1 and prev2:
-                chunk1 = seq1[prev1:begin1]
-                chunk2 = seq2[prev2:begin2]
-                result.append(merge_chunks(chunk1, chunk2))
+    for begin1, begin2, chunk_size in matcher.get_matching_blocks():
+        if begin1 - prev1 or begin2 - prev2:
+            chunk1 = seq1[prev1:begin1]
+            chunk2 = seq2[prev2:begin2]
+            result.append(merge_chunks(chunk1, chunk2))
 
-            result += merge_chunks(seq1[begin1:begin1 + chunkSize], seq2[begin2:begin2 + chunkSize])
-
-            prev1 = begin1 + chunkSize
-            prev2 = begin2 + chunkSize
+        if chunk_size > 0:
+            result += merge_chunks(seq1[begin1:begin1 + chunk_size], seq2[begin2:begin2 + chunk_size])
+            prev1 = begin1 + chunk_size
+            prev2 = begin2 + chunk_size
     return result
+
+
+def generate_spans(original: str, corrected: str) -> Response:
+    response = Response(original_text=original, corrected_text=corrected)
+    original_w = apply_weight(original.split(), 1)
+    corrected_w = apply_weight(corrected.split(), 2)
+
+    combined = join_sequences(original_w, corrected_w)
+
+    character_idx = 0
+    token_idx = 0
+    for element in combined:
+        if len(element) == 1:
+            character_idx += len(' '.join(element[0][0])) + 1
+        else:
+            ordered = sorted(element, key=lambda x: x[1])
+            original_text = ' '.join(ordered[0][0])
+            correction_text = ' '.join(ordered[1][0])
+
+            span_start = character_idx
+            span_end = character_idx
+
+            if original_text == '':  # addition
+                if token_idx != 0:  # include previous word if exists
+                    span_start -= len(original_w[token_idx - 1][0][0][0])
+                    if correction_text:
+                        correction_text = original[span_start:span_end] + ' ' + correction_text
+
+                elif token_idx < len(original_w):  # include upcoming word if exists
+                    span_end += len(original_w[token_idx][0][0][0])  # addition
+                    if correction_text:
+                        correction_text = correction_text + ' ' + original[span_start:span_end]
+
+            else:
+                # substitution
+                span_end += len(original_text)
+                character_idx += len(original_text) + 1
+
+                if correction_text == '':  # deletion
+                    correction_text = None
+                    if token_idx < len(original_w):  # delete upcoming whitespace if exists
+                        span_end += 1
+                    elif token_idx != 0:  # delete previous whitespace if exists
+                        span_start -= 1
+
+                token_idx += 1
+
+            replacements = [Replacement(correction_text)]
+
+            correction = Correction(Span(span_start, span_end, original[span_start:span_end]), replacements)
+            response.corrections.append(correction)
+    return response

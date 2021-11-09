@@ -1,4 +1,5 @@
 language: et
 parameters:
   checkpoint_path: models
-  spm_model: models/spm.model
+  source_language: et0
+  target_language: et1
