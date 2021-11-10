@@ -3,12 +3,10 @@ import logging
 from sys import getsizeof
 from time import time, sleep
 
-from marshmallow import ValidationError
-
 import pika
 import pika.exceptions
 
-from .utils import Response, Request, RequestSchema
+from .dataclasses import Response, Request
 from .gec import GEC
 
 LOGGER = logging.getLogger("gec_worker")
@@ -94,11 +92,8 @@ class MQConsumer:
         LOGGER.info(f"Received request: {{id: {properties.correlation_id}, size: {getsizeof(body)} bytes}}")
         try:
             request = json.loads(body)
-            request = RequestSchema().load(request)
             request = Request(**request)
             response = self.gec.process_request(request)
-        except ValidationError as error:
-            response = Response(status=f'Error parsing input: {error.messages}', status_code=400)
         except Exception as e:
             LOGGER.exception(f'Unexpected error: {e}')
             response = Response(status_code=500, status="Unknown internal error.")

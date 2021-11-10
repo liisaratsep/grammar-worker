@@ -1,6 +1,6 @@
 from difflib import SequenceMatcher
 
-from gec_worker.utils import Response, Replacement, Correction, Span
+from gec_worker.dataclasses import Response, Replacement, Correction, Span
 
 
 def apply_weight(seq, weight):

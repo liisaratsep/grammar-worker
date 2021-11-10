@@ -4,7 +4,7 @@ from typing import List
 
 from nltk import sent_tokenize
 
-from .utils import Response, Request
+from .dataclasses import Response, Request
 from .word_diff import generate_spans
 
 logger = logging.getLogger("gec_worker")
