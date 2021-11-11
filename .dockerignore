@@ -1,4 +1,3 @@
-/models
 .idea/
 __pycache__/
 .git/
@@ -6,5 +5,5 @@ __pycache__/
 Dockerfile
 LICENSE
 README.md
-config/config.yaml
 *.iml
+test.py
