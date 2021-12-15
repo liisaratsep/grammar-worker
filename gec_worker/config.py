@@ -13,7 +13,7 @@ class MQConfig(BaseSettings):
     username: str = 'guest'
     password: str = 'guest'
     exchange: str = 'grammar'
-    heartbeat: int = 30
+    heartbeat: int = 60
     connection_name: str = 'Grammar worker'
 
     class Config:
