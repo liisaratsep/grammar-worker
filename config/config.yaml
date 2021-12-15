@@ -1,5 +1,0 @@
-language: et
-parameters:
-  checkpoint_path: models
-  source_language: et0
-  target_language: et1

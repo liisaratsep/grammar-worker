@@ -7,3 +7,4 @@ LICENSE
 README.md
 *.iml
 test.py
+models/

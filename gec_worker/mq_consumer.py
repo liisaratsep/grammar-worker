@@ -1,37 +1,40 @@
 import json
 import logging
+import hashlib
 from sys import getsizeof
 from time import time, sleep
 
 import pika
 import pika.exceptions
+from pika import credentials, BlockingConnection, ConnectionParameters
 
+from .config import MQConfig
 from .dataclasses import Response, Request
 from .gec import GEC
 
-LOGGER = logging.getLogger("gec_worker")
+logger = logging.getLogger(__name__)
+
+X_EXPIRES = 60000
 
 
 class MQConsumer:
-    def __init__(self, gec: GEC,
-                 connection_parameters: pika.connection.ConnectionParameters,
-                 exchange_name: str,
-                 routing_key: str):
+    def __init__(self, gec: GEC, mq_config: MQConfig):
         """
         Initializes a RabbitMQ consumer class that listens for requests for a specific worker and responds to
         them.
-
-        :param gec: A GEC instance to be used.
-        :param connection_parameters: RabbitMQ connection_parameters parameters.
-        :param exchange_name: RabbitMQ exchange name.
-        :param routing_key: RabbitMQ routing key.
         """
+        self.mq_config = mq_config
         self.gec = gec
-
-        self.exchange_name = exchange_name
-        self.routing_key = routing_key
-        self.connection_parameters = connection_parameters
+        self.routing_keys = []
+        self.queue_name = None
         self.channel = None
+
+        self._generate_queue_config()
+
+    def _generate_queue_config(self):
+        self.routing_keys = [f"{self.mq_config.exchange}.{self.gec.model_config.language}"]
+        hashed = hashlib.sha256(str(self.routing_keys).encode('utf-8')).hexdigest()[:8]
+        self.queue_name = f"{self.mq_config.exchange}.{self.gec.model_config.language}_{hashed}"
 
     def start(self):
         """
@@ -41,14 +44,14 @@ class MQConsumer:
         while True:
             try:
                 self._connect()
-                LOGGER.info('Ready to process requests.')
+                logger.info('Ready to process requests.')
                 self.channel.start_consuming()
             except pika.exceptions.AMQPConnectionError as e:
-                LOGGER.error(e)
-                LOGGER.info('Trying to reconnect in 5 seconds.')
+                logger.error(e)
+                logger.info('Trying to reconnect in 5 seconds.')
                 sleep(5)
             except KeyboardInterrupt:
-                LOGGER.info('Interrupted by user. Exiting...')
+                logger.info('Interrupted by user. Exiting...')
                 self.channel.close()
                 break
 
@@ -57,17 +60,31 @@ class MQConsumer:
         Connects to RabbitMQ, (re)declares the exchange for the service and a queue for the worker binding
         any alternative routing keys as needed.
         """
-        LOGGER.info(f'Connecting to RabbitMQ server: {{host: {self.connection_parameters.host}, '
-                    f'port: {self.connection_parameters.port}}}')
-        connection = pika.BlockingConnection(self.connection_parameters)
+        logger.info(f'Connecting to RabbitMQ server: {{host: {self.mq_config.host}, port: {self.mq_config.port}}}')
+        connection = BlockingConnection(ConnectionParameters(
+            host=self.mq_config.host,
+            port=self.mq_config.port,
+            credentials=credentials.PlainCredentials(
+                username=self.mq_config.username,
+                password=self.mq_config.password
+            ),
+            heartbeat=self.mq_config.heartbeat,
+            client_properties={
+                'connection_name': self.mq_config.connection_name
+            }
+        ))
         self.channel = connection.channel()
-        self.channel.queue_declare(queue=self.routing_key)
-        self.channel.exchange_declare(exchange=self.exchange_name, exchange_type='direct')
+        self.channel.queue_declare(queue=self.queue_name, arguments={
+            'x-expires': X_EXPIRES
+        })
+        self.channel.exchange_declare(exchange=self.mq_config.exchange, exchange_type='direct')
 
-        self.channel.queue_bind(exchange=self.exchange_name, queue=self.routing_key, routing_key=self.routing_key)
+        for route in self.routing_keys:
+            self.channel.queue_bind(exchange=self.mq_config.exchange, queue=self.queue_name,
+                                    routing_key=route)
 
         self.channel.basic_qos(prefetch_count=1)
-        self.channel.basic_consume(queue=self.routing_key, on_message_callback=self._on_request)
+        self.channel.basic_consume(queue=self.queue_name, on_message_callback=self._on_request)
 
     @staticmethod
     def _respond(channel: pika.adapters.blocking_connection.BlockingChannel, method: pika.spec.Basic.Deliver,
@@ -89,19 +106,20 @@ class MQConsumer:
         Pass the request to the GEC and return its response.
         """
         t1 = time()
-        LOGGER.info(f"Received request: {{id: {properties.correlation_id}, size: {getsizeof(body)} bytes}}")
+        logger.info(f"Received request: {{id: {properties.correlation_id}, size: {getsizeof(body)} bytes}}")
         try:
             request = json.loads(body)
             request = Request(**request)
             response = self.gec.process_request(request)
         except Exception as e:
-            LOGGER.exception(f'Unexpected error: {e}')
+            logger.exception(f'Unexpected error: {e}')
             response = Response(status_code=500, status="Unknown internal error.")
 
+        response = response.encode()
         response_size = getsizeof(response)
 
-        self._respond(channel, method, properties, response.encode())
+        self._respond(channel, method, properties, response)
         t2 = time()
 
-        LOGGER.info(f"Request processed: {{id: {properties.correlation_id}, duration: {round(t2 - t1, 3)} s, "
+        logger.info(f"Request processed: {{id: {properties.correlation_id}, duration: {round(t2 - t1, 3)} s, "
                     f"size: {response_size} bytes}}")
