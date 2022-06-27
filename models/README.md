@@ -1,18 +1,7 @@
 # Grammatical error correction models
 
-Models can be attached to the main [grammar-worker](https://github.com/tartunlp/grammar-worker) container by
-mounting a volume at `/app/models/`. Official grammar models can be downloaded from the 
-[releases](https://github.com/tartunlp/grammar-worker/releases) section of this repository. Due to GitHub's 
-file size limitations, these may be uploaded as multipart zip files which have to unpacked first.
-
-Alternatively, models are built into the [`grammar-model`](https://ghcr.io/tartunlp/grammar-model) images 
-published alongside this repository. These are `busybox` images that simply contain all model files in the 
-`/models/` directory. They can be used as init containers to populate the `/app/models/` volume of the 
-[`grammar-worker`](https://ghcr.io/tartunlp/grammar-worker) instance. 
-
-Each model is published as a separate image and corresponds to a specific release. Compatibility between 
-[`grammar-worker`](https://ghcr.io/tartunlp/grammar-worker) and 
-[`grammar-model`](https://ghcr.io/tartunlp/grammar-model) versions will be specified in the release notes.
+Models are either built into the image or can be attached to the
+main [grammar-worker](https://github.com/tartunlp/grammar-worker) container by mounting a volume at `/app/models/`.
 
 ## Model configuration
 
@@ -26,9 +15,6 @@ of the repository). This file should contain the following keys:
 - `sentencepiece_prefix` - the prefix used on all sentencepiece model files
 - `source_language` - input langauge code (as understood by the model)
 - `target_language` - output langauge code (as understood by the model)
-
-The included Dockerfile can be used to publish new model versions. The build-time argument `MODEL_DIR` can be used to
-specify a subdirectory to be copied to `/models/` instead of the current directory.
 
 ### Configuration samples
 

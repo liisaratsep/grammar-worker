@@ -20,6 +20,16 @@ class MQConfig(BaseSettings):
         env_prefix = 'mq_'
 
 
+class WorkerConfig(BaseSettings):
+    """
+    Imports general workr configuration from environment variables
+    """
+    max_input_length: int = 10000
+
+    class Config:
+        env_prefix = 'worker_'
+
+
 class ModelConfig(BaseModel):
     language: str  # actual ISO input language code
     checkpoint_path: str = "models/checkpoint_best.pt"
@@ -35,3 +45,7 @@ def read_model_config(file_path: str) -> ModelConfig:
         model_config = ModelConfig(**yaml.load(f, Loader=SafeLoader))
 
     return model_config
+
+
+mq_config = MQConfig()
+worker_config = WorkerConfig()

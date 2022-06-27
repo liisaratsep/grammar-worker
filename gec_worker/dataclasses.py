@@ -2,13 +2,16 @@ import json
 from dataclasses import dataclass, asdict, field
 from typing import Optional, List
 
+from pydantic import BaseModel, Field
 
-@dataclass
-class Request:
+from gec_worker import worker_config
+
+
+class Request(BaseModel):
     """
     A dataclass to store requests
     """
-    text: str
+    text: str = Field(..., max_length=worker_config.max_input_length)
     language: str
 
 

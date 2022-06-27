@@ -36,11 +36,43 @@ environment. The container should be configured using the following parameters:
           the number of CPU cores which may cause computational overhead when deployed on larger nodes. Alternatively,
           the `docker run` flag `--cpuset-cpus` can be used to control this. For more details, refer to
           the [performance and hardware requirements](#performance-and-hardware-requirements) section below.
+    - Worker-related variables:
+        - `WORKER_MAX_INPUT_LENGTH` (optional) - the number of characters allowed per request (`10000` by default).
+          Longer requests will return validation errors.
 
-By default, the container entrypoint is `main.py` without additional arguments, but these can be defined with the
-`COMMAND` option. For example by using `["--log-logging", "logging/debug.ini"]` to enable debug level logging.
+- Optional runtime flags (the `COMMAND` option):
+    - `--model-config` - path to the model config file (`models/config.yaml` by default). The default file is included
+      in images that already include models. Compatible sample files are included in the `models/` directory and the
+      format is described in [`models/README.md`](https://github.com/TartuNLP/grammar-worker/tree/main/models)).
+    - `--log-config` - path to logging config files (`logging/logging.ini` by default), `logging/debug.ini` can be used
+      for debug-level logging
+    - `--port` - port of the healthcheck probes (`8000` by default):
 
-## Manual setup
+- Endpoints for healthcheck probes:
+    - `/health/startup`
+    - `/health/readiness`
+    - `/health/liveness`
+
+### Building new images
+
+When building the image, the model can be built with different targets. BuildKit should be enabled to skip any unused
+stages of the build.
+
+- `worker-base` - the worker code without any models.
+- `worker-model` - a worker with an included model. Requires **one** of the following build-time arguments:
+    - `MODEL_IMAGE` - the image name where the model is copied from. For example any of
+      the [`translation-model`](https://ghcr.io/TartuNLP/grammar-model) images.
+    - `MODEL_CONFIG_FILE` - path to the model configuration file, for example `models/general.yaml`. The file must
+      contain the otherwise optional key `huggingface` to download the model or the build will fail.
+
+- `env` - an intermediate build stage with all packages installed, but no code.
+- `model-cp` - images that only contain model files and configuration. The separate stage is used to cache this step and
+  speed up builds because model files can be very large. Published
+  at [`translation-model`](https://ghcr.io/TartuNLP/grammar-model). Alternatively, these can be used
+  as init containers to copy models over during startup, but this is quite slow and not recommended.
+- `model` - an alias for the model image, the value of `MODEL_IMAGE` or `model-cp` by default.
+
+## Manual / development setup
 
 For a manual setup, please refer to the included Dockerfile and the environment specification described in
 `requirements/requirements.txt`.
