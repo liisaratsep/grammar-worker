@@ -1,4 +1,4 @@
-name: Docker build
+name: Docker build with model
 
 on:
   workflow_dispatch:
