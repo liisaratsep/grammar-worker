@@ -2,33 +2,34 @@ name: Docker build with model
 
 on:
   workflow_dispatch:
-    version:
-      description: "A semantic version number for the worker component, for example \"1.0.0\"."
-      required: true
-      type: string
-    latest:
-      description: "Whether the worker is equivalent to the \"latest\" tag"
-      required: true
-      type: boolean
-      default: true
-    model_image:
-      description: "The model image to use."
-      required: true
-      type: string
-    model_flavor:
-      description: "The model's flavor (name)."
-      required: true
-      type: string
-      default: "et"
-    model_version:
-      description: "The model's semantic version number to tag the image with."
-      required: true
-      type: string
-    latest_model:
-      description: "Whether the model is equivalent to the \"latest\" tag of this model flavor."
-      required: true
-      type: boolean
-      default: true
+    iputs:
+      version:
+        description: "A semantic version number for the worker component, for example \"1.0.0\"."
+        required: true
+        type: string
+      latest:
+        description: "Whether the worker is equivalent to the \"latest\" tag"
+        required: true
+        type: boolean
+        default: true
+      model_image:
+        description: "The model image to use."
+        required: true
+        type: string
+      model_flavor:
+        description: "The model's flavor (name)."
+        required: true
+        type: string
+        default: "et"
+      model_version:
+        description: "The model's semantic version number to tag the image with."
+        required: true
+        type: string
+      latest_model:
+        description: "Whether the model is equivalent to the \"latest\" tag of this model flavor."
+        required: true
+        type: boolean
+        default: true
 
 env:
   # Use docker.io for Docker Hub if empty
