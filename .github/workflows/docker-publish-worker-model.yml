@@ -2,7 +2,7 @@ name: Docker build with model
 
 on:
   workflow_dispatch:
-    iputs:
+    inputs:
       version:
         description: "A semantic version number for the worker component, for example \"1.0.0\"."
         required: true
